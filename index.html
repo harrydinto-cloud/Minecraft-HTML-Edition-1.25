@@ -124,14 +124,15 @@
             border: 3px solid #666;
             background: rgba(0,0,0,0.7);
             display: flex;
-            flex-direction: column;
             align-items: center;
             justify-content: center;
             position: relative;
+            overflow: hidden;
         }
 
-        .preview-box canvas {
-            image-rendering: pixelated;
+        #skin-preview-container {
+            width: 100%;
+            height: 100%;
         }
 
         .profile-form {
@@ -219,7 +220,7 @@
 
         <div class="profile-content">
             <div class="preview-box">
-                <canvas id="skin-preview-canvas" width="160" height="220"></canvas>
+                <div id="skin-preview-container"></div>
             </div>
 
             <div class="profile-form">
@@ -277,58 +278,6 @@
     </div>
 
     <script>
-        // --- CALM 4 BACKGROUND MUSIC SYNTHESIZER ---
-        let audioCtx = null;
-        let isMusicPlaying = false;
-
-        function playCalm4() {
-            if (isMusicPlaying) return;
-            audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-            isMusicPlaying = true;
-
-            const notes = [
-                { f: 349.23, d: 0.6, t: 0.0 },
-                { f: 523.25, d: 0.6, t: 0.6 },
-                { f: 392.00, d: 0.6, t: 1.2 },
-                { f: 440.00, d: 1.2, t: 1.8 },
-                { f: 349.23, d: 0.6, t: 3.2 },
-                { f: 523.25, d: 0.6, t: 3.8 },
-                { f: 392.00, d: 1.2, t: 4.4 },
-                { f: 329.63, d: 0.6, t: 6.0 },
-                { f: 392.00, d: 0.6, t: 6.6 },
-                { f: 440.00, d: 0.6, t: 7.2 },
-                { f: 349.23, d: 1.2, t: 7.8 }
-            ];
-
-            const loopDuration = 9.5;
-
-            function scheduleLoop(startTime) {
-                notes.forEach(note => {
-                    const osc = audioCtx.createOscillator();
-                    const gain = audioCtx.createGain();
-                    
-                    osc.type = 'triangle';
-                    osc.frequency.setValueAtTime(note.f, startTime + note.t);
-
-                    gain.gain.setValueAtTime(0.001, startTime + note.t);
-                    gain.gain.exponentialRampToValueAtTime(0.12, startTime + note.t + 0.1);
-                    gain.gain.exponentialRampToValueAtTime(0.001, startTime + note.t + note.d);
-
-                    osc.connect(gain);
-                    gain.connect(audioCtx.destination);
-
-                    osc.start(startTime + note.t);
-                    osc.stop(startTime + note.t + note.d + 0.1);
-                });
-
-                setTimeout(() => {
-                    if (isMusicPlaying) scheduleLoop(audioCtx.currentTime);
-                }, loopDuration * 1000);
-            }
-
-            scheduleLoop(audioCtx.currentTime + 0.1);
-        }
-
         // --- REAL PROCEDURAL PIXEL TEXTURE GENERATORS ---
         function generatePixelTexture(type) {
             const canvas = document.createElement('canvas');
@@ -567,11 +516,11 @@
         camera.add(playerArm);
         scene.add(camera);
 
-        // --- MULTIPLAYER PLAYER AVATAR ---
+        // --- MULTIPLAYER PLAYER AVATAR & 3D PREVIEW SYSTEM ---
         const SKINS = {
-            steve: { head: 0xc58c67, body: 0x00a8a8, pants: 0x000080 },
-            alex: { head: 0xe5a97d, body: 0x55a832, pants: 0x47392d },
-            zombie: { head: 0x486b3a, body: 0x00a8a8, pants: 0x000080 }
+            steve: { head: 0xc58c67, body: 0x00a8a8, pants: 0x000080, arms: 0xc58c67 },
+            alex: { head: 0xe5a97d, body: 0x55a832, pants: 0x47392d, arms: 0xe5a97d },
+            zombie: { head: 0x486b3a, body: 0x00a8a8, pants: 0x000080, arms: 0x486b3a }
         };
 
         let currentSkin = 'steve';
@@ -584,13 +533,24 @@
             const headMat = new THREE.MeshLambertMaterial({ color: skinData.head });
             const bodyMat = new THREE.MeshLambertMaterial({ color: skinData.body });
             const pantsMat = new THREE.MeshLambertMaterial({ color: skinData.pants });
+            const armMat = new THREE.MeshLambertMaterial({ color: skinData.arms });
 
+            // Head
             const head = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.5, 0.5), headMat);
             head.position.y = 1.5; group.add(head);
 
+            // Body
             const body = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.75, 0.25), bodyMat);
             body.position.y = 0.875; group.add(body);
 
+            // Arms
+            const armLeft = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.75, 0.2), armMat);
+            armLeft.position.set(-0.375, 0.875, 0); group.add(armLeft);
+
+            const armRight = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.75, 0.2), armMat);
+            armRight.position.set(0.375, 0.875, 0); group.add(armRight);
+
+            // Legs
             const leg1 = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.75, 0.2), pantsMat);
             leg1.position.set(-0.125, 0.125, 0); group.add(leg1);
 
@@ -603,52 +563,71 @@
 
         const remotePlayers = new Map();
 
-        // --- 2D CANVAS SKIN PREVIEW ---
-        const previewCanvas = document.getElementById('skin-preview-canvas');
-        const pCtx = previewCanvas.getContext('2d');
+        // --- 3D SKIN PREVIEW VIEWPORT ---
+        const previewContainer = document.getElementById('skin-preview-container');
+        const previewScene = new THREE.Scene();
+        const previewCamera = new THREE.PerspectiveCamera(45, 200 / 280, 0.1, 100);
+        previewCamera.position.set(0, 0.9, 3.5);
 
-        function drawSkinPreview(skinKey) {
-            const skin = SKINS[skinKey] || SKINS.steve;
-            pCtx.clearRect(0, 0, previewCanvas.width, previewCanvas.height);
+        const previewRenderer = new THREE.WebGLRenderer({ alpha: true, antialias: true });
+        previewRenderer.setSize(200, 280);
+        previewContainer.appendChild(previewRenderer.domElement);
 
-            // Shadow
-            pCtx.fillStyle = 'rgba(0,0,0,0.4)';
-            pCtx.beginPath();
-            pCtx.ellipse(80, 205, 45, 10, 0, 0, Math.PI * 2);
-            pCtx.fill();
+        const previewLight1 = new THREE.AmbientLight(0xffffff, 0.8);
+        previewScene.add(previewLight1);
+        const previewLight2 = new THREE.DirectionalLight(0xffffff, 0.5);
+        previewLight2.position.set(2, 4, 3);
+        previewScene.add(previewLight2);
 
-            // Head
-            pCtx.fillStyle = '#' + skin.head.toString(16).padStart(6, '0');
-            pCtx.fillRect(52, 25, 56, 56);
+        let previewAvatarGroup = null;
 
-            // Eyes
-            pCtx.fillStyle = '#ffffff';
-            pCtx.fillRect(64, 48, 10, 6);
-            pCtx.fillRect(86, 48, 10, 6);
-            pCtx.fillStyle = '#4040b0';
-            pCtx.fillRect(70, 48, 4, 6);
-            pCtx.fillRect(86, 48, 4, 6);
+        function update3DSkinPreview(skinKey) {
+            if (previewAvatarGroup) previewScene.remove(previewAvatarGroup);
 
-            // Body
-            pCtx.fillStyle = '#' + skin.body.toString(16).padStart(6, '0');
-            pCtx.fillRect(52, 81, 56, 68);
+            const group = new THREE.Group();
+            const skinData = SKINS[skinKey] || SKINS.steve;
 
-            // Arms
-            pCtx.fillStyle = '#' + skin.head.toString(16).padStart(6, '0');
-            pCtx.fillRect(28, 81, 24, 68);
-            pCtx.fillRect(108, 81, 24, 68);
+            const headMat = new THREE.MeshLambertMaterial({ color: skinData.head });
+            const bodyMat = new THREE.MeshLambertMaterial({ color: skinData.body });
+            const pantsMat = new THREE.MeshLambertMaterial({ color: skinData.pants });
+            const armMat = new THREE.MeshLambertMaterial({ color: skinData.arms });
 
-            // Legs
-            pCtx.fillStyle = '#' + skin.pants.toString(16).padStart(6, '0');
-            pCtx.fillRect(52, 149, 26, 52);
-            pCtx.fillRect(82, 149, 26, 52);
+            const head = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.5, 0.5), headMat);
+            head.position.y = 1.35; group.add(head);
+
+            const body = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.75, 0.25), bodyMat);
+            body.position.y = 0.725; group.add(body);
+
+            const armLeft = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.75, 0.2), armMat);
+            armLeft.position.set(-0.375, 0.725, 0); group.add(armLeft);
+
+            const armRight = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.75, 0.2), armMat);
+            armRight.position.set(0.375, 0.725, 0); group.add(armRight);
+
+            const leg1 = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.75, 0.2), pantsMat);
+            leg1.position.set(-0.125, -0.025, 0); group.add(leg1);
+
+            const leg2 = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.75, 0.2), pantsMat);
+            leg2.position.set(0.125, -0.025, 0); group.add(leg2);
+
+            previewAvatarGroup = group;
+            previewScene.add(previewAvatarGroup);
         }
 
-        drawSkinPreview('steve');
+        update3DSkinPreview('steve');
+
+        function animatePreview() {
+            requestAnimationFrame(animatePreview);
+            if (previewAvatarGroup) {
+                previewAvatarGroup.rotation.y += 0.015;
+            }
+            previewRenderer.render(previewScene, previewCamera);
+        }
+        animatePreview();
 
         document.getElementById('skin-select').addEventListener('change', (e) => {
             currentSkin = e.target.value;
-            drawSkinPreview(currentSkin);
+            update3DSkinPreview(currentSkin);
         });
 
         // --- WORLD GENERATION ---
@@ -760,7 +739,6 @@
         camera.rotation.order = 'YXZ';
 
         function openProfileScreen(mode) {
-            playCalm4();
             pendingMode = mode;
             document.getElementById('main-menu').style.display = 'none';
             document.getElementById('profile-screen').style.display = 'flex';
@@ -823,9 +801,10 @@
                 opt.value = newSkinName.toLowerCase();
                 opt.innerText = newSkinName;
                 select.appendChild(opt);
-                SKINS[opt.value] = { head: Math.random() * 0xffffff, body: Math.random() * 0xffffff, pants: Math.random() * 0xffffff };
+                const randomHex = Math.floor(Math.random() * 0xffffff);
+                SKINS[opt.value] = { head: randomHex, body: randomHex, pants: Math.floor(Math.random() * 0xffffff), arms: randomHex };
                 select.value = opt.value;
-                drawSkinPreview(opt.value);
+                update3DSkinPreview(opt.value);
             }
         };
 
@@ -833,7 +812,7 @@
             const select = document.getElementById('skin-select');
             select.innerHTML = '<option value="steve">Default Steve</option>';
             currentSkin = 'steve';
-            drawSkinPreview('steve');
+            update3DSkinPreview('steve');
         };
 
         document.addEventListener('pointerlockchange', () => {
