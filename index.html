@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Minecraft Alpha 0.3</title>
+    <title>Minecraft HTML Edition 1.25</title>
     <style>
         @font-face {
             font-family: 'Minecraft';
@@ -207,7 +207,7 @@
         </div>
 
         <div class="title-footer">
-            <div>Minecraft Java Edition 26.2</div>
+            <div>Minecraft HTML Edition 1.25</div>
             <div>Copyright Mojang AB. Do not distribute!</div>
         </div>
     </div>
@@ -253,7 +253,7 @@
     <div id="hud">
         <div id="crosshair"></div>
         <div id="debug-info">
-            Minecraft Java 26.2<br>
+            Minecraft HTML Edition 1.25<br>
             Player: <span id="hud-player-name" style="color:#55FF55;">Steve</span><br>
             FPS: <span id="fps">60</span> | Chunks: <span id="chunk-count">0</span><br>
             Pos: <span id="pos-info">X: 0, Y: 0, Z: 0</span><br>
@@ -286,19 +286,18 @@
             audioCtx = new (window.AudioContext || window.webkitAudioContext)();
             isMusicPlaying = true;
 
-            // Calm 4 MIDI sequence (F, C, G, A progression with delay)
             const notes = [
-                { f: 349.23, d: 0.6, t: 0.0 },  // F4
-                { f: 523.25, d: 0.6, t: 0.6 },  // C5
-                { f: 392.00, d: 0.6, t: 1.2 },  // G4
-                { f: 440.00, d: 1.2, t: 1.8 },  // A4
-                { f: 349.23, d: 0.6, t: 3.2 },  // F4
-                { f: 523.25, d: 0.6, t: 3.8 },  // C5
-                { f: 392.00, d: 1.2, t: 4.4 },  // G4
-                { f: 329.63, d: 0.6, t: 6.0 },  // E4
-                { f: 392.00, d: 0.6, t: 6.6 },  // G4
-                { f: 440.00, d: 0.6, t: 7.2 },  // A4
-                { f: 349.23, d: 1.2, t: 7.8 }   // F4
+                { f: 349.23, d: 0.6, t: 0.0 },
+                { f: 523.25, d: 0.6, t: 0.6 },
+                { f: 392.00, d: 0.6, t: 1.2 },
+                { f: 440.00, d: 1.2, t: 1.8 },
+                { f: 349.23, d: 0.6, t: 3.2 },
+                { f: 523.25, d: 0.6, t: 3.8 },
+                { f: 392.00, d: 1.2, t: 4.4 },
+                { f: 329.63, d: 0.6, t: 6.0 },
+                { f: 392.00, d: 0.6, t: 6.6 },
+                { f: 440.00, d: 0.6, t: 7.2 },
+                { f: 349.23, d: 1.2, t: 7.8 }
             ];
 
             const loopDuration = 9.5;
@@ -311,7 +310,6 @@
                     osc.type = 'triangle';
                     osc.frequency.setValueAtTime(note.f, startTime + note.t);
 
-                    // Soft ambient envelope
                     gain.gain.setValueAtTime(0.001, startTime + note.t);
                     gain.gain.exponentialRampToValueAtTime(0.12, startTime + note.t + 0.1);
                     gain.gain.exponentialRampToValueAtTime(0.001, startTime + note.t + note.d);
