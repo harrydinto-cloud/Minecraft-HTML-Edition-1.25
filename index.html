@@ -37,6 +37,15 @@
             z-index: -1;
         }
 
+        /* DIRTY DIRT BACKGROUND FOR PROFILE SCREEN */
+        .dirt-background {
+            position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
+            background: #2b1d12 url('https://cdn.jsdelivr.net/gh/South-Team/Minecraft-Font@master/dirt.png');
+            background-size: 64px 64px;
+            filter: brightness(0.4);
+            z-index: -1;
+        }
+
         /* LOGO CONTAINER */
         .title-container {
             position: relative;
@@ -69,25 +78,10 @@
         }
         .mc-btn:hover { background: #60a030; border-top-color: #90e050; border-left-color: #90e050; }
 
-        .mc-input {
-            background: rgba(0, 0, 0, 0.8); color: #FFF; border: 2px solid #555;
-            padding: 8px; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 13px;
-            outline: none; text-align: center; width: 100%; letter-spacing: 1px;
-        }
-
-        /* Room ID Style */
-        .room-id-display {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif !important;
-            font-weight: bold;
-            font-size: 14px;
-            color: #55FF55;
-            background: rgba(0,0,0,0.85);
-            padding: 4px 8px;
-            border: 1px solid #444;
-            border-radius: 4px;
-            display: inline-block;
-            margin-top: 4px;
-            user-select: all;
+        .mc-input, .mc-select {
+            background: #000; color: #FFF; border: 2px solid #a0a0a0;
+            padding: 8px 12px; font-family: 'Minecraft', monospace; font-size: 14px;
+            outline: none; width: 100%; box-shadow: inset 2px 2px 0 #373737;
         }
 
         /* FOOTER INFO */
@@ -98,6 +92,60 @@
             font-size: 12px;
             color: #FFF;
             text-shadow: 2px 2px 0px #000;
+        }
+
+        /* --- EDIT PROFILE UI --- */
+        #profile-screen {
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            justify-content: space-between;
+            padding: 20px;
+        }
+
+        .profile-title {
+            font-size: 24px;
+            text-shadow: 3px 3px 0 #000;
+            margin-top: 10px;
+        }
+
+        .profile-content {
+            display: flex;
+            gap: 40px;
+            align-items: center;
+            justify-content: center;
+            width: 100%;
+            max-width: 650px;
+        }
+
+        .preview-box {
+            width: 200px;
+            height: 280px;
+            border: 3px solid #666;
+            background: rgba(0,0,0,0.7);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+        }
+
+        .preview-box canvas {
+            image-rendering: pixelated;
+        }
+
+        .profile-form {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            width: 320px;
+        }
+
+        .form-label {
+            font-size: 14px;
+            color: #aaa;
+            margin-bottom: 4px;
+            text-shadow: 1px 1px 0 #000;
         }
 
         /* --- IN-GAME HUD --- */
@@ -147,7 +195,7 @@
         <div class="menu-buttons">
             <button class="mc-btn" id="btn-singleplayer">Singleplayer</button>
             <button class="mc-btn" id="btn-host">Host Multiplayer</button>
-            <input type="text" id="join-id-input" class="mc-input" placeholder="Enter Room ID to Join">
+            <input type="text" id="join-id-input" class="mc-input" style="text-align: center;" placeholder="Enter Room ID to Join">
             <button class="mc-btn" id="btn-join">Join Multiplayer</button>
 
             <div class="row-double">
@@ -164,11 +212,49 @@
         </div>
     </div>
 
+    <!-- EDIT PROFILE SCREEN -->
+    <div id="profile-screen" class="menu-overlay">
+        <div class="dirt-background"></div>
+        <div class="profile-title">Edit Profile</div>
+
+        <div class="profile-content">
+            <div class="preview-box">
+                <canvas id="skin-preview-canvas" width="160" height="220"></canvas>
+            </div>
+
+            <div class="profile-form">
+                <div>
+                    <div class="form-label">Username</div>
+                    <input type="text" id="player-username" class="mc-input" value="Steve" maxlength="16">
+                </div>
+
+                <div>
+                    <div class="form-label">Player Skin</div>
+                    <select id="skin-select" class="mc-select">
+                        <option value="steve">Default Steve</option>
+                        <option value="alex">Alex</option>
+                        <option value="zombie">Zombie</option>
+                    </select>
+                </div>
+
+                <div class="row-double" style="margin-top: 10px;">
+                    <button class="mc-btn" id="btn-add-skin" style="font-size: 12px;">Add Skin</button>
+                    <button class="mc-btn" id="btn-clear-list" style="font-size: 12px;">Clear List</button>
+                </div>
+            </div>
+        </div>
+
+        <div style="width: 350px; margin-bottom: 20px;">
+            <button class="mc-btn" id="btn-profile-done">Done</button>
+        </div>
+    </div>
+
     <!-- IN-GAME HUD -->
     <div id="hud">
         <div id="crosshair"></div>
         <div id="debug-info">
             Minecraft Java 26.2<br>
+            Player: <span id="hud-player-name" style="color:#55FF55;">Steve</span><br>
             FPS: <span id="fps">60</span> | Chunks: <span id="chunk-count">0</span><br>
             Pos: <span id="pos-info">X: 0, Y: 0, Z: 0</span><br>
             <span id="mp-status" style="color:#55FF55;"></span>
@@ -191,6 +277,60 @@
     </div>
 
     <script>
+        // --- CALM 4 BACKGROUND MUSIC SYNTHESIZER ---
+        let audioCtx = null;
+        let isMusicPlaying = false;
+
+        function playCalm4() {
+            if (isMusicPlaying) return;
+            audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            isMusicPlaying = true;
+
+            // Calm 4 MIDI sequence (F, C, G, A progression with delay)
+            const notes = [
+                { f: 349.23, d: 0.6, t: 0.0 },  // F4
+                { f: 523.25, d: 0.6, t: 0.6 },  // C5
+                { f: 392.00, d: 0.6, t: 1.2 },  // G4
+                { f: 440.00, d: 1.2, t: 1.8 },  // A4
+                { f: 349.23, d: 0.6, t: 3.2 },  // F4
+                { f: 523.25, d: 0.6, t: 3.8 },  // C5
+                { f: 392.00, d: 1.2, t: 4.4 },  // G4
+                { f: 329.63, d: 0.6, t: 6.0 },  // E4
+                { f: 392.00, d: 0.6, t: 6.6 },  // G4
+                { f: 440.00, d: 0.6, t: 7.2 },  // A4
+                { f: 349.23, d: 1.2, t: 7.8 }   // F4
+            ];
+
+            const loopDuration = 9.5;
+
+            function scheduleLoop(startTime) {
+                notes.forEach(note => {
+                    const osc = audioCtx.createOscillator();
+                    const gain = audioCtx.createGain();
+                    
+                    osc.type = 'triangle';
+                    osc.frequency.setValueAtTime(note.f, startTime + note.t);
+
+                    // Soft ambient envelope
+                    gain.gain.setValueAtTime(0.001, startTime + note.t);
+                    gain.gain.exponentialRampToValueAtTime(0.12, startTime + note.t + 0.1);
+                    gain.gain.exponentialRampToValueAtTime(0.001, startTime + note.t + note.d);
+
+                    osc.connect(gain);
+                    gain.connect(audioCtx.destination);
+
+                    osc.start(startTime + note.t);
+                    osc.stop(startTime + note.t + note.d + 0.1);
+                });
+
+                setTimeout(() => {
+                    if (isMusicPlaying) scheduleLoop(audioCtx.currentTime);
+                }, loopDuration * 1000);
+            }
+
+            scheduleLoop(audioCtx.currentTime + 0.1);
+        }
+
         // --- REAL PROCEDURAL PIXEL TEXTURE GENERATORS ---
         function generatePixelTexture(type) {
             const canvas = document.createElement('canvas');
@@ -430,11 +570,22 @@
         scene.add(camera);
 
         // --- MULTIPLAYER PLAYER AVATAR ---
-        function createPlayerAvatar() {
+        const SKINS = {
+            steve: { head: 0xc58c67, body: 0x00a8a8, pants: 0x000080 },
+            alex: { head: 0xe5a97d, body: 0x55a832, pants: 0x47392d },
+            zombie: { head: 0x486b3a, body: 0x00a8a8, pants: 0x000080 }
+        };
+
+        let currentSkin = 'steve';
+        let currentUsername = 'Steve';
+
+        function createPlayerAvatar(skinKey = 'steve') {
             const group = new THREE.Group();
-            const headMat = new THREE.MeshLambertMaterial({ color: 0xc58c67 });
-            const bodyMat = new THREE.MeshLambertMaterial({ color: 0x00a8a8 });
-            const pantsMat = new THREE.MeshLambertMaterial({ color: 0x000080 });
+            const skinData = SKINS[skinKey] || SKINS.steve;
+
+            const headMat = new THREE.MeshLambertMaterial({ color: skinData.head });
+            const bodyMat = new THREE.MeshLambertMaterial({ color: skinData.body });
+            const pantsMat = new THREE.MeshLambertMaterial({ color: skinData.pants });
 
             const head = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.5, 0.5), headMat);
             head.position.y = 1.5; group.add(head);
@@ -453,6 +604,54 @@
         }
 
         const remotePlayers = new Map();
+
+        // --- 2D CANVAS SKIN PREVIEW ---
+        const previewCanvas = document.getElementById('skin-preview-canvas');
+        const pCtx = previewCanvas.getContext('2d');
+
+        function drawSkinPreview(skinKey) {
+            const skin = SKINS[skinKey] || SKINS.steve;
+            pCtx.clearRect(0, 0, previewCanvas.width, previewCanvas.height);
+
+            // Shadow
+            pCtx.fillStyle = 'rgba(0,0,0,0.4)';
+            pCtx.beginPath();
+            pCtx.ellipse(80, 205, 45, 10, 0, 0, Math.PI * 2);
+            pCtx.fill();
+
+            // Head
+            pCtx.fillStyle = '#' + skin.head.toString(16).padStart(6, '0');
+            pCtx.fillRect(52, 25, 56, 56);
+
+            // Eyes
+            pCtx.fillStyle = '#ffffff';
+            pCtx.fillRect(64, 48, 10, 6);
+            pCtx.fillRect(86, 48, 10, 6);
+            pCtx.fillStyle = '#4040b0';
+            pCtx.fillRect(70, 48, 4, 6);
+            pCtx.fillRect(86, 48, 4, 6);
+
+            // Body
+            pCtx.fillStyle = '#' + skin.body.toString(16).padStart(6, '0');
+            pCtx.fillRect(52, 81, 56, 68);
+
+            // Arms
+            pCtx.fillStyle = '#' + skin.head.toString(16).padStart(6, '0');
+            pCtx.fillRect(28, 81, 24, 68);
+            pCtx.fillRect(108, 81, 24, 68);
+
+            // Legs
+            pCtx.fillStyle = '#' + skin.pants.toString(16).padStart(6, '0');
+            pCtx.fillRect(52, 149, 26, 52);
+            pCtx.fillRect(82, 149, 26, 52);
+        }
+
+        drawSkinPreview('steve');
+
+        document.getElementById('skin-select').addEventListener('change', (e) => {
+            currentSkin = e.target.value;
+            drawSkinPreview(currentSkin);
+        });
 
         // --- WORLD GENERATION ---
         const blockGeometry = new THREE.BoxGeometry(1, 1, 1);
@@ -557,19 +756,86 @@
         const moveState = { forward: false, backward: false, left: false, right: false };
         const velocity = new THREE.Vector3();
         let isGrounded = false;
+        let pendingMode = 'singleplayer';
 
         camera.position.set(8, 25, 8);
         camera.rotation.order = 'YXZ';
 
-        function startWorld() {
+        function openProfileScreen(mode) {
+            playCalm4();
+            pendingMode = mode;
             document.getElementById('main-menu').style.display = 'none';
+            document.getElementById('profile-screen').style.display = 'flex';
+        }
+
+        function startWorld() {
+            currentUsername = document.getElementById('player-username').value.trim() || 'Steve';
+            document.getElementById('hud-player-name').innerText = currentUsername;
+            document.getElementById('profile-screen').style.display = 'none';
             document.getElementById('hud').style.display = 'block';
             document.body.requestPointerLock();
         }
 
         document.getElementById('btn-singleplayer').onclick = () => {
-            document.getElementById('mp-status').innerText = "MODE: SINGLEPLAYER";
-            startWorld();
+            openProfileScreen('singleplayer');
+        };
+
+        document.getElementById('btn-host').onclick = () => {
+            openProfileScreen('host');
+        };
+
+        document.getElementById('btn-join').onclick = () => {
+            openProfileScreen('join');
+        };
+
+        document.getElementById('btn-profile-done').onclick = () => {
+            if (pendingMode === 'singleplayer') {
+                document.getElementById('mp-status').innerText = "MODE: SINGLEPLAYER";
+                startWorld();
+            } else if (pendingMode === 'host') {
+                const status = document.getElementById('status-msg');
+                status.innerText = "STARTING HOST SERVER...";
+                initPeer((id) => {
+                    status.innerHTML = `ROOM CREATED!<br><span class="room-id-display">${id}</span>`;
+                    document.getElementById('mp-status').innerText = `HOSTING (ID: ${id})`;
+                    startWorld();
+                });
+            } else if (pendingMode === 'join') {
+                const joinId = document.getElementById('join-id-input').value.trim();
+                const status = document.getElementById('status-msg');
+                if (!joinId) { status.innerText = "PLEASE ENTER ROOM ID!"; return; }
+                status.innerText = "CONNECTING TO HOST...";
+                initPeer(() => {
+                    const conn = peer.connect(joinId);
+                    conn.on('open', () => {
+                        connections.push(conn);
+                        setupConn(conn);
+                        document.getElementById('mp-status').innerText = `CONNECTED TO HOST`;
+                        startWorld();
+                    });
+                });
+            }
+        };
+
+        document.getElementById('btn-add-skin').onclick = () => {
+            const newSkinName = prompt("Enter new skin name:");
+            if (newSkinName) {
+                const select = document.getElementById('skin-select');
+                const opt = document.createElement('option');
+                opt.value = newSkinName.toLowerCase();
+                opt.innerText = newSkinName;
+                select.appendChild(opt);
+                SKINS[opt.value] = { head: Math.random() * 0xffffff, body: Math.random() * 0xffffff, pants: Math.random() * 0xffffff };
+                select.value = opt.value;
+                drawSkinPreview(opt.value);
+            }
+        };
+
+        document.getElementById('btn-clear-list').onclick = () => {
+            const select = document.getElementById('skin-select');
+            select.innerHTML = '<option value="steve">Default Steve</option>';
+            currentSkin = 'steve';
+            drawSkinPreview('steve');
         };
 
         document.addEventListener('pointerlockchange', () => {
@@ -630,7 +896,6 @@
         document.addEventListener('mousedown', (e) => {
             if (document.pointerLockElement !== document.body) return;
 
-            // Arm Punch Animation
             playerArm.position.z = -0.3;
             setTimeout(() => playerArm.position.z = -0.5, 120);
 
@@ -680,7 +945,7 @@
             conn.on('data', (data) => {
                 if (data.type === 'move') {
                     if (!remotePlayers.has(conn.peer)) {
-                        remotePlayers.set(conn.peer, createPlayerAvatar());
+                        remotePlayers.set(conn.peer, createPlayerAvatar(data.skin));
                     }
                     const avatar = remotePlayers.get(conn.peer);
                     avatar.position.set(data.x, data.y - 1.5, data.z);
@@ -702,32 +967,6 @@
             const msg = { type: 'block', cx, cz, lx, ly, lz, blockType };
             connections.forEach(conn => conn.send(msg));
         }
-
-        document.getElementById('btn-host').onclick = () => {
-            const status = document.getElementById('status-msg');
-            status.innerText = "STARTING HOST SERVER...";
-            initPeer((id) => {
-                status.innerHTML = `ROOM CREATED!<br><span class="room-id-display">${id}</span>`;
-                document.getElementById('mp-status').innerText = `HOSTING (ID: ${id})`;
-                startWorld();
-            });
-        };
-
-        document.getElementById('btn-join').onclick = () => {
-            const joinId = document.getElementById('join-id-input').value.trim();
-            const status = document.getElementById('status-msg');
-            if (!joinId) { status.innerText = "PLEASE ENTER ROOM ID!"; return; }
-            status.innerText = "CONNECTING TO HOST...";
-            initPeer(() => {
-                const conn = peer.connect(joinId);
-                conn.on('open', () => {
-                    connections.push(conn);
-                    setupConn(conn);
-                    document.getElementById('mp-status').innerText = `CONNECTED TO HOST`;
-                    startWorld();
-                });
-            });
-        };
 
         // --- GAME LOOP ---
         let clock = new THREE.Clock();
@@ -769,14 +1008,15 @@
 
                 updateChunks();
 
-                // Broadcast Position
                 if (Date.now() - lastNetSend > 50 && connections.length > 0) {
                     const posMsg = {
                         type: 'move',
                         x: camera.position.x,
                         y: camera.position.y,
                         z: camera.position.z,
-                        ry: camera.rotation.y
+                        ry: camera.rotation.y,
+                        skin: currentSkin,
+                        name: currentUsername
                     };
                     connections.forEach(conn => conn.send(posMsg));
                     lastNetSend = Date.now();
